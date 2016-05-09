@@ -1,0 +1,199 @@
+---
+title: "COURSERA - Reproducible Research"
+author: "Bruce Granger"
+date: "May 5, 2016"
+output: html_document
+---
+
+####### BACKGROUND: This analysis makes use of data from a personal activity monitoring device. The data is taken at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and includes the number of steps taken in 5 minute intervals each day.
+
+####### PRIMARY OBJECTIVES: Analyze the data and determine:
+1. Load the data (i.e. read.csv())
+2. Total number of steps taken each day
+2. Mean and median number of steps taken each day
+3. Time series plot of the average number of steps taken
+4. The 5-minute interval that, on average, contains the maximum number of steps
+5. Code to describe and show a strategy for imputing missing data
+6. Histogram of the total number of steps taken each day after missing values are imputed
+7. Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+####### SECONDARY OBJECTIVES:
+- Explain code blocks
+
+[Personal Activity Monitoring Dataset](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip) [52K]
+
+- Steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+- Date: The date on which the measurement was taken in YYYY-MM-DD format
+- Interval: Identifier for the 5-minute interval in which measurement was taken
+- The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+#### --------------------------------------------- SETUP ------------------------------------------------------------------------------
+1. In the setup block, obtaining the current working directory, which will be changed during this routine then returned to the original
+working directory.
+2. Path variables hold path information.
+3. Zip variables hold name of the Zip file and the file within the zip containing the activity monitoring dataset.
+```{r SETUP, echo=TRUE}
+ORG_WD<-getwd()
+R_Path<-("L:/Coursera/DataScience/Reproducible_Research/Reproducible-ResearchAssignmentW2")
+Raw_Data_Path<-("L:/Coursera/DataScience/Reproducible_Research")
+Zip_Name<-("repdata_data_activity.zip")
+Zip_File_Name<-("activity.csv")
+setwd(Raw_Data_Path)
+```
+
+#### --------------------------------------------- FILE READING -----------------------------------------------------------------------
+```{r FILE READING, echo=TRUE}
+# DETERMINE IF FILE (ACTIVITY) HAS BEEN UNZIPED, IF NO THEN UNZIP ELSE DO NOTHING.
+if(file.exists(Zip_File_Name)){
+        print("FILE EXISTS, NOTHING TO DO")#CONDITION TRUE - DO NOTHING.
+}else{unzip(paste(Raw_Data_Path,"/",Zip_Name, sep = ""))     #CONDITION FALSE - UNZIP FILE  
+}
+# READ (ACTIVITY MONITORING DATASET) FILE INTO MEMORY, EXPLICITLY DEFINE COLUMN CLASS.
+Act<- read.csv(paste(Raw_Data_Path,"/",Zip_File_Name, sep = ""), header=TRUE, sep=",",
+               colClasses=c("numeric", "character", "numeric"))
+str(Act)   # NOTICE THE DATE FIELD IS DEFINE OF CHARACTER TYPE (chr), THIS WILL BE USED WHEN CONVERTED TO DATE USING as.DATE
+# NOTICE THAT ALL 17,568 OBSERVATIONS AND THREE VARIABLES (steps, date, & interval) WERE READ INTO MEMORY.
+```
+
+#### --------------------------------------------- DATA MANUPLIATION - STEPS PER DAY ------------------------------------------------
+```{r DATA MANUPLITATION, echo=TRUE}
+# REMOVE NA VALUES FROM DATA FRAME.
+library(stats)
+Act_1<-na.omit(Act)
+# NOTICE THE OBSERVATIONS NOW TOTAL 15,264, WHICH MEANS 2,304 HAD "N/A".
+str(Act_1)
+# REMOVE ENTRIES THAT ARE 0 "ZERO".
+Act_2<-Act_1[Act_1$steps!=0,]
+# NOTICE THE OBSERVATIONS NOW TOTAL 4,250, WHICH 11,014 HAD "0" IN THE STEP FIELD. 
+str(Act_2)
+# CONVERTING THE DATE FIELD, WHICH IS OF OBJECT TYPE.CHARACTER, TO A DATE OBJECT CLASS.
+Act_2$date <- as.Date(Act_2$date, format = "%Y-%m-%d")
+str(Act_2)
+# COERCING THE INTERVAL FIELD FROM A NUMERIC CLASS INTO A FACTOR.
+Act_2$interval<-as.factor(Act_2$interval)
+str(Act_2)
+# REQUIREMENT 1: TOTAL NUMBER OF STEPS TAKEN EACH DAY.
+# GROUP (AGGREGATE) THE TOTAL (SUM) STEPS TAKEN BY DATE.
+SPD <- aggregate(steps ~ date, Act_2, sum)
+colnames(SPD) <- c("Date","Total_Steps_Per_Day")
+str(SPD)
+# STEPS TAKEN PER DAY
+head(SPD)
+```
+
+#### ------------------------------- PLOTTING STEPS PER DAY --------------------------------------------------------------------------
+```{r LOAD GGPLOT LIBRARY, echo=TRUE}
+# LOAD THE GGPLOT2 LIBRARY
+library(ggplot2)
+```
+
+```{r PLOTTING STEPS PER DAY, echo= TRUE}
+# REQUIREMENT 2: MAKE HISTOGRAM OF THE TOTAL NUMBER OF STEPS TAKEN EACH DAY. 
+qplot(x=Total_Steps_Per_Day, data=SPD, main="Total Steps Per Day by Count",
+      geom="histogram",xlab = "Total Steps", fill=I("blue"),col=I("red"),
+      ylab = "Occurance of Total Steps", alpha=I(.2), bins = 30)
+```
+
+#### ------------------------------- PLOTTING MEAN & MEDIAN STEPS PER DAY -----------------------------------------------------
+```{r MEAN AND MEDIAN, echo= TRUE}
+# REQUIREMENT 3: CALCULATE THE MEAN AND MEDIAN STEPS PER DAY.
+SPD_Mean<-mean(SPD$Total_Steps_Per_Day)
+SPD_Median<-median(SPD$Total_Steps_Per_Day)
+sprintf("%.9f", SPD_Mean) # MEAN
+sprintf("%.9f", SPD_Median)# MEDIAN
+```
+
+#### ---------------------- DATA MANUPLIATION - AVG STEPS TAKEN, AVG ACROSS ALL DAYS --------------------------------
+```{r AVG STEPS TAKEN PER INTERVAL, echo= TRUE}
+#  BEGINNING WITH ORIGINAL DATASET, Act (Activity Monitoring Dataset), WHICH CONTAINS "NA" AND ZERO (0) VALUES IN THE STEPS FIELD.
+Act_3<-Act
+str(Act_3)
+#    COERCING THE DATE FIELD IN THE ACT_3 DATA.FRAME, WHICH IS OF OBJECT TYPE.CHARACTER(chr), TO A DATE OBJECT CLASS
+#    WITH A FORMATE OF YEAR-MONTH-DAY.
+Act_3$date <- as.Date(Act_3$date, format = "%Y-%m-%d")
+str(Act_3)
+# COERCING THE INTERVAL FIELD IN THE ACT_3 DATA.FRAME, FROM A NUMERIC (num) CLASS INTO A FACTOR.
+Act_3$interval <- as.factor(Act_3$interval)
+str(Act_3)
+# REQUIREMENT 4: TOTAL NUMBER OF STEPS TAKEN EACH DAY
+# GROUP (AGGREGATE) THE MEAN STEPS TAKEN BY INTERVAL, REMOVING THE NA VALUES (na.rm=TRUE) FROM THE DATASET.
+# INTO A DATA.FRAME CALLED MSPI (MEAN STEPS PER INTERVAL)
+MSPI <- aggregate(Act_3$steps, by = list(interval = Act_3$interval),FUN=mean, na.rm=TRUE)
+str(MSPI)
+# COERCING THE INTERVAL FIELD IN THE MSPI DATA.FRAME, FROM A FACTOR INTO A INTEGER (INT) CLASS.
+MSPI$interval <-as.integer(levels(MSPI$interval)[MSPI$interval])
+str(MSPI)
+# RENAMING THE COLUMNS, AS A RESULT OF THE AGGERGATE PROCESS, TO BETTER IDENTIFY THE FIELD. 
+colnames(MSPI) <- c("Interval", "MSPI")
+str(MSPI)
+```
+
+#### ------------------------------- PLOTTING AVG STEPS TAKEN, AVG ACROSS ALL DAYS -----------------------------------
+```{r PLOT AVG STEPS TAKEN PER INTERVAL, echo= TRUE}
+ggplot(MSPI,aes(x=Interval, y=MSPI))+
+        geom_line(color="red", size=.1) +  
+        theme(panel.background = element_rect(fill = 'grey95'),
+        panel.grid.major = element_line(colour = "black", size=.1),
+        panel.grid.minor = element_line(colour = "blue")) +
+        labs(title="MEAN STEPS TAKEN PER INTERVAL", x="Time Interval (5 Sec)", y="MEAN Number of Steps")
+```
+
+#### ----- WHICH 5-MIN INTERVAL, ON AVG ACROSS ALL DAYS, IS THE MAX NUMBERS OF STEPS -----------
+```{r LOAD THE DLYPR LIBRARY, echo=TRUE}
+library(dplyr)
+```
+
+```{r MAX MEAN STEPS PER INTERVAL, echo=TRUE}
+# REQUIREMENT 5: USING THE FILTER FUNCTION WITHIN THE DPLYR PACKAGE  
+# WITHIN THE MSPI DATA.FRAME, FIND THE MAX STEPS WITHING THE MSPI FIELD
+print(filter(MSPI, MSPI == max(MSPI$MSPI)))
+```
+
+#### ------------------------- MEDIAN IN PLACE OF NA VALUES  ---------------------------------------------------------------
+```{r NUMBER OF MISSING VALUES, echo=TRUE}
+# REQUIREMENT 5: CALCULATE THE TOTAL NUMBER OF MISSING VALUES (NA) IN THE STEPS FIELD. 
+sum(is.na(Act_3$steps))
+# REQUIREMENT 6:  REPLACE MISSING VALUES (NA) mean/median
+Act_4<-Act_3
+Act_4$steps[which(is.na(Act_4$steps))]<-SPD_Median
+# REQUIREMENT 7: CALCULATE THE MEAN AND MEDIAN STEPS PER DAY WITH MISSING VALUES (NA) REPLACED WITH MEDIAN.
+Act_4$date <- as.Date(Act_4$date, format = "%Y-%m-%d")
+Act_4$interval <- as.factor(Act_4$interval)
+MSPI_NONA <- aggregate(Act_4$steps, by = list(interval = Act_4$interval),FUN=mean, na.rm=TRUE)
+MSPI_NONA$interval <-as.integer(levels(MSPI_NONA$interval)[MSPI_NONA$interval])
+colnames(MSPI_NONA) <- c("Interval", "MSPI")
+SPD_Mean_NONA<-mean(MSPI_NONA$MSPI)
+SPD_Median_NONA<-median(MSPI_NONA$MSPI)
+# MEAN WITHOUT NA's
+sprintf("%.9f", SPD_Mean) 
+# MEAN, MEDIAN IN PLACE OF NA VALUES
+sprintf("%.9f", SPD_Mean_NONA)
+# MEAN WITHOUT NA's - MEAN, MEDIAN IN PLACE OF NA VALUES
+sprintf("%.9f", SPD_Mean-SPD_Mean_NONA)
+# MEDIAN WITHOUT NA's
+sprintf("%.9f", SPD_Median)      
+# MEDIAN, MEDIAN IN PLACE OF NA VALUES
+sprintf("%.9f", SPD_Median_NONA)
+# MEDIAN WITHOUT NA's - MEDIAN, MEDIAN IN PLACE OF NA VALUES
+sprintf("%.9f", SPD_Median-SPD_Median_NONA)
+```
+
+#### ------------------------------- PLOTTING MEDIAN IN PLACE OF NA VALUES -----------------------------------
+```{r PLOT AVG STEPS TAKEN PER INTERVAL - MEDAIN IN PLACE OF NA, echo= TRUE}
+# REQUIREMENT 7: PLOT VG STEPS TAKEN PER INTERVAL - MEDAIN IN PLACE OF NA
+ggplot(MSPI_NONA,aes(x=Interval, y=MSPI))+
+        geom_line(color="red", size=.1) +  
+        theme(panel.background = element_rect(fill = 'grey95'),
+        panel.grid.major = element_line(colour = "black", size=.1),
+        panel.grid.minor = element_line(colour = "blue")) +
+        labs(title="MEAN STEPS TAKEN PER INTERVAL - MEDIAN Replaced NA", x="Time Interval (5 Sec)", y="MEAN Number of Steps")
+```
+
+#### --------------------------------- WEEKDAY VS WEEKEND -------------------------------------------------------
+
+
+#### --------------------------------------- CLOSEOUT PROCESSES ------------------------------------------------------------
+```{r RETURN TO ORIGINAL WORKING DIRECTORY, echo=TRUE}
+# RETURN THE ORIGINAL WORKING DIRECTORY VALUE
+setwd(ORG_WD)
+```
